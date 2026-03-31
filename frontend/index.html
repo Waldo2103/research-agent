@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agente de Research</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icono">🔍</span>
+        <div>
+          <span class="logo-titulo">Agente de Research</span>
+          <span class="logo-subtitulo">Investigación automatizada con IA</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- Formulario de búsqueda -->
+    <section class="seccion-busqueda">
+      <h1 class="titulo-busqueda">¿Qué querés investigar?</h1>
+      <p class="subtitulo-busqueda">
+        Ingresá un tema, candidato, propuesta o cualquier consulta.
+        El agente buscará información en la web y generará un informe ejecutivo en PDF.
+      </p>
+      <form id="form-research" class="form-busqueda">
+        <div class="input-grupo">
+          <input
+            type="text"
+            id="input-tema"
+            class="input-busqueda"
+            placeholder="Ej: candidato Juan Pérez, propuesta de aumento de cuotas..."
+            maxlength="500"
+            required
+            autocomplete="off"
+          >
+          <button type="submit" id="btn-investigar" class="btn-investigar">
+            <span class="btn-texto">Investigar</span>
+            <span class="btn-icono">→</span>
+          </button>
+        </div>
+        <div class="input-ayuda">
+          <span id="contador-chars" class="contador">0 / 500</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Estado de carga -->
+    <section id="seccion-cargando" class="seccion-cargando oculto">
+      <div class="cargando-contenido">
+        <div class="spinner"></div>
+        <h2 class="cargando-titulo">Investigando...</h2>
+        <p id="cargando-estado" class="cargando-estado">Generando consultas de búsqueda</p>
+        <div class="pasos-progreso">
+          <div class="paso activo" id="paso-1">
+            <span class="paso-icono">🔎</span>
+            <span>Buscando</span>
+          </div>
+          <div class="paso-linea"></div>
+          <div class="paso" id="paso-2">
+            <span class="paso-icono">🧠</span>
+            <span>Analizando</span>
+          </div>
+          <div class="paso-linea"></div>
+          <div class="paso" id="paso-3">
+            <span class="paso-icono">📄</span>
+            <span>Generando PDF</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mensaje de error -->
+    <section id="seccion-error" class="seccion-error oculto">
+      <div class="error-contenido">
+        <span class="error-icono">⚠️</span>
+        <h2>No se pudo generar el informe</h2>
+        <p id="error-mensaje" class="error-mensaje"></p>
+        <button onclick="reiniciar()" class="btn-secundario">Intentar de nuevo</button>
+      </div>
+    </section>
+
+    <!-- Resultado del informe -->
+    <section id="seccion-informe" class="seccion-informe oculto">
+
+      <div class="informe-header">
+        <div class="informe-meta">
+          <h2 id="informe-tema" class="informe-tema"></h2>
+          <div class="informe-datos">
+            <span id="informe-fecha" class="dato-meta"></span>
+            <span class="dato-separador">·</span>
+            <span id="informe-duracion" class="dato-meta"></span>
+          </div>
+        </div>
+        <div class="informe-acciones">
+          <a id="btn-pdf" class="btn-pdf" href="#" target="_blank" download>
+            ⬇ Descargar PDF
+          </a>
+          <button onclick="reiniciar()" class="btn-secundario">Nueva búsqueda</button>
+        </div>
+      </div>
+
+      <!-- Badge de sentimiento -->
+      <div id="sentimiento-banner" class="sentimiento-banner">
+        <div>
+          <span id="sentimiento-badge" class="sentimiento-badge"></span>
+          <span id="sentimiento-justificacion" class="sentimiento-justificacion"></span>
+        </div>
+        <div class="sentimiento-barra-contenedor">
+          <div id="sentimiento-barra" class="sentimiento-barra"></div>
+          <div class="sentimiento-barra-etiquetas">
+            <span>Muy Negativo</span>
+            <span>Neutro</span>
+            <span>Muy Positivo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs de navegación -->
+      <div class="tabs">
+        <button class="tab activo" data-tab="resumen">Resumen</button>
+        <button class="tab" data-tab="analisis">Análisis</button>
+        <button class="tab" data-tab="conclusiones">Conclusiones</button>
+        <button class="tab" data-tab="fuentes">Fuentes</button>
+      </div>
+
+      <!-- Panel: Resumen Ejecutivo -->
+      <div id="tab-resumen" class="tab-panel activo">
+        <h3 class="panel-titulo">Resumen Ejecutivo</h3>
+        <div id="contenido-resumen" class="texto-cuerpo"></div>
+      </div>
+
+      <!-- Panel: Análisis -->
+      <div id="tab-analisis" class="tab-panel oculto">
+        <h3 class="panel-titulo">Puntos a Favor y en Contra</h3>
+        <div class="tabla-pros-contras">
+          <div class="columna-pros">
+            <h4 class="columna-titulo favor">✓ A Favor</h4>
+            <ul id="lista-pros" class="lista-puntos favor"></ul>
+          </div>
+          <div class="columna-contras">
+            <h4 class="columna-titulo contra">✗ En Contra</h4>
+            <ul id="lista-contras" class="lista-puntos contra"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Conclusiones -->
+      <div id="tab-conclusiones" class="tab-panel oculto">
+        <h3 class="panel-titulo">Conclusiones</h3>
+        <div id="contenido-conclusiones" class="texto-cuerpo"></div>
+        <h3 class="panel-titulo">Recomendaciones</h3>
+        <ul id="lista-recomendaciones" class="lista-recomendaciones"></ul>
+      </div>
+
+      <!-- Panel: Fuentes -->
+      <div id="tab-fuentes" class="tab-panel oculto">
+        <h3 class="panel-titulo">Fuentes Consultadas</h3>
+        <div id="tabla-fuentes" class="tabla-fuentes-contenedor"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Agente de Research · Powered by LangChain + Ollama + DuckDuckGo</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

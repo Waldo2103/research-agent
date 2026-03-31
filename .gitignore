@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables — NUNCA commitear claves
+.env
+*.env.local
+
+# Data generada en runtime
+data/
+*.db
+*.sqlite
+
+# PDFs generados
+*.pdf
+
+# Logs
+*.log
+logs/
+
+# Docker
+.docker/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Ollama models (grandes, no van en el repo)
+models/
