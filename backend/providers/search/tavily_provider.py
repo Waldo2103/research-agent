@@ -1,23 +1,13 @@
 """
 Proveedor de búsqueda usando Tavily.
 
-TODO: Enchufar cuando haya API key.
 Tier gratuito: 1000 búsquedas/mes. Registrar en https://tavily.com/
-
-Ventajas sobre DuckDuckGo:
-- API oficial con resultados más confiables
-- Búsqueda de noticias recientes garantizada
-- Control granular sobre dominios incluidos/excluidos
-- Mejor cobertura de contenido en español
-
-Para activar:
-    1. Registrarse en https://tavily.com/
-    2. Configurar TAVILY_API_KEY en .env
-    3. Configurar SEARCH_PROVIDER=tavily en .env
-    4. Reiniciar el servicio
 """
 
 import logging
+from datetime import datetime
+
+from tavily import AsyncTavilyClient
 
 from models.report import ResultadoBusqueda
 from providers.search.base_search import BaseSearchProvider, ProveedorBusquedaError
@@ -26,11 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class TavilyProvider(BaseSearchProvider):
-    """
-    Proveedor de búsqueda usando la API de Tavily.
-
-    TODO: Implementar cuando se tenga API key.
-    """
+    """Proveedor de búsqueda usando la API de Tavily."""
 
     def __init__(
         self,
@@ -40,42 +26,64 @@ class TavilyProvider(BaseSearchProvider):
         dominios_incluidos: list[str] | None = None,
         dominios_excluidos: list[str] | None = None,
     ) -> None:
-        self._api_key = api_key
+        if not api_key:
+            raise ProveedorBusquedaError(
+                proveedor="tavily",
+                mensaje="TAVILY_API_KEY no está configurada en .env",
+            )
         self._max_resultados = max_resultados
         self._profundidad = profundidad
         self._dominios_incluidos = dominios_incluidos or []
         self._dominios_excluidos = dominios_excluidos or []
+        self._cliente = AsyncTavilyClient(api_key=api_key)
+
+        logger.info(
+            "TavilyProvider inicializado: profundidad=%s, max_resultados=%d",
+            profundidad,
+            max_resultados,
+        )
 
     async def buscar(
         self, consulta: str, max_resultados: int | None = None
     ) -> list[ResultadoBusqueda]:
-        """
-        TODO: Implementar búsqueda con Tavily.
+        """Ejecuta una búsqueda en Tavily y retorna los resultados."""
+        limite = max_resultados or self._max_resultados
+        fecha_consulta = datetime.now()
 
-        Descomentar cuando se tenga API key:
+        logger.info("Tavily buscando: '%s' (max: %d)", consulta, limite)
 
-        from tavily import TavilyClient
-        cliente = TavilyClient(api_key=self._api_key)
-        respuesta = cliente.search(
-            query=consulta,
-            max_results=max_resultados or self._max_resultados,
-            search_depth=self._profundidad,
-            include_domains=self._dominios_incluidos,
-            exclude_domains=self._dominios_excluidos,
-        )
-        return [
-            ResultadoBusqueda(
-                titulo=r["title"],
-                url=r["url"],
-                fragmento=r["content"],
+        try:
+            respuesta = await self._cliente.search(
+                query=consulta,
+                max_results=limite,
+                search_depth=self._profundidad,
+                include_domains=self._dominios_incluidos or None,
+                exclude_domains=self._dominios_excluidos or None,
             )
-            for r in respuesta["results"]
-        ]
-        """
-        raise NotImplementedError(
-            "TavilyProvider no está implementado aún. "
-            "Configurar TAVILY_API_KEY y descomentar el código en tavily_provider.py"
-        )
+
+            resultados = [
+                ResultadoBusqueda(
+                    titulo=r.get("title", "Sin título"),
+                    url=r.get("url", ""),
+                    fragmento=r.get("content", ""),
+                    fecha_consulta=fecha_consulta,
+                )
+                for r in respuesta.get("results", [])
+                if r.get("url")
+            ]
+
+            logger.info(
+                "Tavily retornó %d resultados para '%s'",
+                len(resultados),
+                consulta,
+            )
+            return resultados
+
+        except Exception as e:
+            raise ProveedorBusquedaError(
+                proveedor=self.nombre,
+                mensaje=f"Error en búsqueda de Tavily: {e}",
+            ) from e
 
     @property
     def nombre(self) -> str:
