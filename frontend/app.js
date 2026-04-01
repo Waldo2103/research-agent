@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
   configurarFormulario();
   configurarTabs();
   configurarContadorChars();
+  cargarHistorial();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,49 +52,86 @@ function configurarFormulario() {
 }
 
 async function ejecutarInvestigacion(tema) {
-  // Mostrar estado de carga
   mostrarCargando(true);
   ocultarError();
   ocultarInforme();
   deshabilitarFormulario(true);
 
-  // Simular progreso visual
-  const intervaloProgreso = simularProgreso();
-
   try {
-    const inicio = Date.now();
-
-    const respuesta = await fetch(`${API_BASE}/research`, {
+    const respuesta = await fetch(`${API_BASE}/research/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tema }),
     });
-
-    clearInterval(intervaloProgreso);
 
     if (!respuesta.ok) {
       const datos = await respuesta.json().catch(() => ({}));
       throw new Error(datos.detail || `Error del servidor: ${respuesta.status}`);
     }
 
-    const datos = await respuesta.json();
-    const duracion = ((Date.now() - inicio) / 1000).toFixed(1);
+    const reader = respuesta.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    // Marcar paso 3 como activo y luego mostrar el informe
-    marcarPaso(3, "activo");
-    await esperar(400);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    mostrarCargando(false);
-    renderizarInforme(datos.informe, duracion);
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parsear eventos SSE del buffer
+      const lineas = buffer.split("\n");
+      buffer = lineas.pop(); // La última línea puede estar incompleta
+
+      let eventoActual = {};
+      for (const linea of lineas) {
+        if (linea.startsWith("event: ")) {
+          eventoActual.type = linea.slice(7).trim();
+        } else if (linea.startsWith("data: ")) {
+          try {
+            eventoActual.data = JSON.parse(linea.slice(6));
+          } catch {
+            eventoActual.data = {};
+          }
+        } else if (linea === "" && eventoActual.type) {
+          await manejarEventoSSE(eventoActual);
+          eventoActual = {};
+        }
+      }
+    }
 
   } catch (error) {
-    clearInterval(intervaloProgreso);
     mostrarCargando(false);
     mostrarError(error.message || "Error inesperado. Intentá de nuevo.");
     console.error("Error en investigación:", error);
 
   } finally {
     deshabilitarFormulario(false);
+  }
+}
+
+async function manejarEventoSSE(evento) {
+  const { type, data } = evento;
+
+  if (type === "progreso") {
+    const paso = data.paso || 1;
+    const mensaje = data.mensaje || "";
+
+    // Marcar pasos anteriores como completos, el actual como activo
+    for (let i = 1; i < paso; i++) marcarPaso(i, "completo");
+    marcarPaso(paso, "activo");
+    cargandoEstado.textContent = mensaje;
+
+  } else if (type === "resultado") {
+    for (let i = 1; i <= 5; i++) marcarPaso(i, "completo");
+    await esperar(300);
+    mostrarCargando(false);
+    renderizarInforme(data.informe, data.duracion_segundos?.toFixed(1) ?? "—");
+    cargarHistorial(); // Actualizar historial con el nuevo informe
+
+  } else if (type === "error") {
+    mostrarCargando(false);
+    mostrarError(data.mensaje || "Error inesperado. Intentá de nuevo.");
   }
 }
 
@@ -258,8 +296,7 @@ function mostrarCargando(mostrar) {
   seccionCargando.classList.toggle("oculto", !mostrar);
 
   if (mostrar) {
-    // Resetear pasos de progreso
-    [1, 2, 3].forEach((n) => marcarPaso(n, ""));
+    [1, 2, 3, 4, 5].forEach((n) => marcarPaso(n, ""));
     marcarPaso(1, "activo");
     cargandoEstado.textContent = "Generando consultas de búsqueda...";
   }
@@ -285,23 +322,6 @@ function deshabilitarFormulario(deshabilitar) {
   btnInvestigar.querySelector(".btn-texto").textContent = deshabilitar
     ? "Investigando..."
     : "Investigar";
-}
-
-// Simula el progreso de los pasos mientras espera la respuesta
-function simularProgreso() {
-  let paso = 1;
-  return setInterval(() => {
-    paso = Math.min(paso + 1, 3);
-    marcarPaso(paso - 1, "completo");
-    marcarPaso(paso, "activo");
-
-    const mensajes = [
-      "Generando consultas de búsqueda...",
-      "Buscando en la web...",
-      "Analizando y sintetizando...",
-    ];
-    cargandoEstado.textContent = mensajes[paso - 1] || "Procesando...";
-  }, 8000); // Avanza cada 8 segundos (aprox. para Ollama local)
 }
 
 function marcarPaso(numero, estado) {
@@ -382,4 +402,61 @@ function recortarUrl(url) {
 
 function esperar(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HISTORIAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function cargarHistorial() {
+  const contenedor = document.getElementById("historial-contenido");
+  if (!contenedor) return;
+
+  try {
+    const resp = await fetch(`${API_BASE}/historial`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const informes = await resp.json();
+
+    if (!informes || informes.length === 0) {
+      contenedor.innerHTML = '<p class="historial-vacio">No hay informes generados aún.</p>';
+      return;
+    }
+
+    const colores = { positivo: "#27ae60", negativo: "#e74c3c", neutro: "#f39c12" };
+
+    const filas = informes.map((inf) => {
+      const color = colores[inf.sentimiento_clasificacion] || "#7f8c8d";
+      const fecha = formatearFecha(inf.fecha_creacion);
+      const pdfBtn = inf.url_pdf
+        ? `<a href="${escaparAtrib(inf.url_pdf)}" class="btn-pdf-mini" target="_blank" download>⬇ PDF</a>`
+        : '<span class="sin-pdf">—</span>';
+
+      return `
+        <tr>
+          <td class="hist-tema">${escaparHTML(inf.tema)}</td>
+          <td><span class="hist-badge" style="background:${color}">${escaparHTML(inf.sentimiento_clasificacion)}</span></td>
+          <td class="hist-fuentes">${inf.num_fuentes}</td>
+          <td class="hist-fecha">${fecha}</td>
+          <td>${pdfBtn}</td>
+        </tr>`;
+    }).join("");
+
+    contenedor.innerHTML = `
+      <table class="tabla-historial">
+        <thead>
+          <tr>
+            <th>Tema</th>
+            <th>Sentimiento</th>
+            <th>Fuentes</th>
+            <th>Fecha</th>
+            <th>PDF</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>`;
+
+  } catch (e) {
+    contenedor.innerHTML = '<p class="historial-vacio">Error al cargar el historial.</p>';
+    console.error("Error cargando historial:", e);
+  }
 }

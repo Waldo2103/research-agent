@@ -16,12 +16,14 @@ import re
 import time
 import uuid
 from datetime import datetime
+from typing import Awaitable, Callable, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from models.report import AnalisisSentimiento, InformeResearch, ResultadoBusqueda
 from providers.llm.base_llm import BaseLLMProvider
 from providers.search.base_search import BaseSearchProvider, ProveedorBusquedaError
+from services.scraper_service import enriquecer_fuentes
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +132,12 @@ REGLAS ESTRICTAS:
 - Si no hay suficiente información sobre algún aspecto, indicarlo explícitamente
 - El análisis debe ser objetivo y basado en los resultados encontrados
 - No inventar información que no esté en las fuentes
+- CITAS OBLIGATORIAS: cuando una afirmación proviene de una fuente específica, incluí \
+la referencia entre corchetes al final de la oración. Ejemplo: "X logró Y en 2023. [3]" \
+o "Según fuentes oficiales, Z ocurrió el año pasado. [1][5]". Los números corresponden \
+al número de fuente en la lista de RESULTADOS DE BÚSQUEDA (Fuente 1, Fuente 2, etc.). \
+Usá citas en el resumen_ejecutivo, puntos_a_favor, puntos_en_contra, analisis_sentimiento \
+y conclusiones.
 - RESPONDER ÚNICAMENTE CON EL JSON VÁLIDO, sin texto antes ni después"""
 
 
@@ -179,7 +187,11 @@ class AgenteResearch:
             max_busquedas,
         )
 
-    async def investigar(self, tema: str) -> InformeResearch:
+    async def investigar(
+        self,
+        tema: str,
+        on_progreso: Optional[Callable[[int, int, str], Awaitable[None]]] = None,
+    ) -> InformeResearch:
         """
         Ejecuta el flujo completo de investigación sobre un tema.
 
@@ -198,13 +210,18 @@ class AgenteResearch:
         logger.info("=== INICIANDO INVESTIGACIÓN ===")
         logger.info("ID: %s | Tema: %s", informe_id, tema)
 
+        async def _emit(paso: int, total: int, mensaje: str) -> None:
+            logger.info("Paso %d/%d: %s", paso, total, mensaje)
+            if on_progreso:
+                await on_progreso(paso, total, mensaje)
+
         # Paso 1: Generar consultas de búsqueda
-        logger.info("Paso 1/3: Generando consultas de búsqueda...")
+        await _emit(1, 5, "Generando consultas de búsqueda...")
         consultas = await self._generar_consultas(tema)
         logger.info("Consultas generadas (%d): %s", len(consultas), consultas)
 
         # Paso 2: Ejecutar búsquedas en paralelo
-        logger.info("Paso 2/3: Ejecutando %d búsquedas en paralelo...", len(consultas))
+        await _emit(2, 5, f"Ejecutando {len(consultas)} búsquedas en paralelo...")
         resultados = await self._buscar_en_paralelo(consultas)
         logger.info("Total de resultados obtenidos: %d", len(resultados))
 
@@ -213,8 +230,12 @@ class AgenteResearch:
                 f"No se encontraron resultados para el tema: '{tema}'"
             )
 
-        # Paso 3: Sintetizar informe
-        logger.info("Paso 3/3: Sintetizando informe con LLM...")
+        # Paso 3: Enriquecer fuentes con contenido completo via scraping
+        await _emit(3, 5, f"Descargando contenido completo de {min(len(resultados), 10)} fuentes...")
+        resultados = await enriquecer_fuentes(resultados)
+
+        # Paso 4: Sintetizar informe
+        await _emit(4, 5, "Sintetizando informe con IA...")
         informe = await self._sintetizar_informe(
             tema=tema,
             resultados=resultados,
@@ -380,8 +401,9 @@ class AgenteResearch:
         llm = self._llm_provider.get_modelo()
 
         # Formatear resultados para el prompt (limitar para no exceder el contexto)
-        # Con Ollama en CPU, menos tokens = inferencia significativamente más rápida
-        resultados_texto = _formatear_resultados_para_prompt(resultados, max_items=8)
+        # Con scraping habilitado, cada fuente puede traer hasta 3000 chars.
+        # Usamos 10 fuentes como balance entre profundidad y velocidad de síntesis.
+        resultados_texto = _formatear_resultados_para_prompt(resultados, max_items=10)
 
         prompt = PROMPT_INFORME.format(
             tema=tema,
@@ -529,7 +551,7 @@ def _formatear_resultados_para_prompt(
     Returns:
         Texto formateado con los resultados
     """
-    MAX_CHARS_FRAGMENTO = 300  # Truncar fragmentos largos para reducir tokens
+    MAX_CHARS_FRAGMENTO = 3000  # Contenido completo si el scraping lo enriqueció
 
     lineas = []
     for i, r in enumerate(resultados[:max_items], 1):

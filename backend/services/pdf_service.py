@@ -6,8 +6,10 @@ template HTML/CSS. El template usa la misma paleta visual que el frontend.
 """
 
 import logging
+import re
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlparse
 
 from weasyprint import HTML, CSS
 from weasyprint.text.fonts import FontConfiguration
@@ -94,26 +96,31 @@ class PDFService:
 
         # Sección de puntos a favor y en contra
         pros_html = "".join(
-            f"<li>{self._escapar(p)}</li>" for p in informe.puntos_a_favor
+            f"<li>{self._citar(p)}</li>" for p in informe.puntos_a_favor
         )
         contras_html = "".join(
-            f"<li>{self._escapar(c)}</li>" for c in informe.puntos_en_contra
+            f"<li>{self._citar(c)}</li>" for c in informe.puntos_en_contra
         )
 
         # Sección de recomendaciones
         recomendaciones_html = "".join(
-            f"<li>{self._escapar(r)}</li>" for r in informe.recomendaciones
+            f"<li>{self._citar(r)}</li>" for r in informe.recomendaciones
         )
 
         # Sección de fuentes
         fuentes_html = ""
         for i, fuente in enumerate(informe.fuentes, 1):
             fecha_consulta = fuente.fecha_consulta.strftime("%d/%m/%Y %H:%M")
+            dominio = urlparse(fuente.url).netloc or fuente.url[:50]
+            extracto = fuente.fragmento[:200] + "…" if len(fuente.fragmento) > 200 else fuente.fragmento
             fuentes_html += f"""
-            <tr>
+            <tr id="fuente-{i}">
                 <td class="fuente-num">{i}</td>
-                <td>{self._escapar(fuente.titulo)}</td>
-                <td><a href="{self._escapar(fuente.url)}">{self._escapar(fuente.url[:60])}...</a></td>
+                <td>
+                    <strong>{self._escapar(fuente.titulo)}</strong>
+                    <div class="fuente-extracto">{self._escapar(extracto)}</div>
+                </td>
+                <td><a href="{self._escapar(fuente.url)}">{self._escapar(dominio)}</a></td>
                 <td class="fuente-fecha">{fecha_consulta}</td>
             </tr>"""
 
@@ -131,9 +138,19 @@ class PDFService:
         # Párrafos del resumen ejecutivo
         parrafos_resumen = informe.resumen_ejecutivo.split("\n\n")
         resumen_html = "".join(
-            f"<p>{self._escapar(p.strip())}</p>"
+            f"<p>{self._citar(p.strip())}</p>"
             for p in parrafos_resumen if p.strip()
         )
+
+        # Conclusiones con citas
+        parrafos_conclusiones = informe.conclusiones.split("\n\n")
+        conclusiones_html = "".join(
+            f"<p>{self._citar(p.strip())}</p>"
+            for p in parrafos_conclusiones if p.strip()
+        )
+
+        # Sentimiento con citas
+        justificacion_html = self._citar(sentimiento.justificacion)
 
         return f"""<!DOCTYPE html>
 <html lang="es">
@@ -286,6 +303,15 @@ class PDFService:
   .tabla-fuentes a {{ color: #2980b9; text-decoration: none; }}
   .fuente-num {{ text-align: center; width: 30px; font-weight: bold; }}
   .fuente-fecha {{ white-space: nowrap; color: #7f8c8d; }}
+  .fuente-extracto {{ font-size: 7.5pt; color: #7f8c8d; font-style: italic; margin-top: 3px; }}
+
+  /* ── Citas inline ── */
+  sup.cita-ref a {{
+    color: #2980b9;
+    text-decoration: none;
+    font-size: 7pt;
+    font-weight: bold;
+  }}
 
   /* ── Pie de página ── */
   @page {{
@@ -346,14 +372,14 @@ class PDFService:
         <span>Neutro</span>
         <span>Muy Positivo</span>
       </div>
-      <div class="sentimiento-justificacion">{self._escapar(sentimiento.justificacion)}</div>
+      <div class="sentimiento-justificacion">{justificacion_html}</div>
     </div>
   </div>
 
   <!-- 4. Conclusiones y Recomendaciones -->
   <div class="seccion">
     <div class="seccion-titulo">4. Conclusiones y Recomendaciones</div>
-    <p>{self._escapar(informe.conclusiones)}</p>
+    {conclusiones_html}
     <br>
     <strong>Recomendaciones:</strong>
     <ul class="lista-recomendaciones">{recomendaciones_html}</ul>
@@ -378,6 +404,18 @@ class PDFService:
 </div>
 </body>
 </html>"""
+
+    def _citar(self, texto: str) -> str:
+        """
+        Escapa el texto y convierte referencias [N] en superíndices
+        con hipervínculo a la fila correspondiente en la tabla de fuentes.
+        """
+        texto_escapado = self._escapar(texto)
+        return re.sub(
+            r"\[(\d+)\]",
+            r'<sup class="cita-ref"><a href="#fuente-\1">[\1]</a></sup>',
+            texto_escapado,
+        )
 
     @staticmethod
     def _escapar(texto: str) -> str:

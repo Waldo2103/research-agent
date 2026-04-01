@@ -37,8 +37,9 @@ python-dotenv>=1.0.0
 pydantic>=2.8.0
 pydantic-settings>=2.4.0
 
-# HTTP async (para health checks de proveedores)
+# HTTP async (para health checks de proveedores y scraping de fuentes)
 httpx>=0.27.0
+trafilatura>=1.12.0            # Extracción de contenido limpio desde páginas web
 
 # Testing
 pytest>=8.3.0

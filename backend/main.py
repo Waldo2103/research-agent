@@ -4,13 +4,16 @@ Punto de entrada de la API REST.
 Define los endpoints de FastAPI y configura la aplicación.
 """
 
+import asyncio
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from agent.research_agent import AgentError
 from config import (
@@ -95,6 +98,12 @@ report_service = ReportService()
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@app.get("/api/historial", tags=["Investigación"], summary="Listado de informes generados")
+async def listar_historial(limite: int = 50) -> list[dict]:
+    """Retorna los últimos N informes del historial, del más reciente al más antiguo."""
+    return report_service.listar_historial(limite=limite)
+
+
 @app.get("/health", tags=["Sistema"])
 async def health_check() -> dict:
     """
@@ -158,6 +167,62 @@ async def generar_informe(solicitud: SolicitudResearch) -> RespuestaResearch:
             status_code=500,
             detail=f"El informe se generó pero falló la creación del PDF: {e}",
         ) from e
+
+
+@app.post(
+    "/api/research/stream",
+    tags=["Investigación"],
+    summary="Generar informe con progreso en tiempo real (SSE)",
+)
+async def generar_informe_stream(solicitud: SolicitudResearch) -> StreamingResponse:
+    """
+    Igual que POST /api/research pero devuelve un stream SSE con eventos de progreso.
+
+    Eventos emitidos:
+    - `event: progreso` — avance de cada paso (paso, total, mensaje)
+    - `event: resultado` — informe completo al finalizar
+    - `event: error`    — mensaje de error si falla
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    inicio = time.time()
+
+    async def on_progreso(paso: int, total: int, mensaje: str) -> None:
+        await queue.put({"type": "progreso", "paso": paso, "total": total, "mensaje": mensaje})
+
+    async def run() -> None:
+        try:
+            informe, _ = await report_service.generar_informe(
+                solicitud.tema, on_progreso=on_progreso
+            )
+            await queue.put({
+                "type": "resultado",
+                "informe": informe.model_dump(mode="json"),
+                "duracion_segundos": round(time.time() - inicio, 2),
+            })
+        except Exception as e:
+            logger.error("Error en stream para tema='%s': %s", solicitud.tema, e)
+            await queue.put({"type": "error", "mensaje": str(e)})
+        finally:
+            await queue.put(None)  # sentinel para cerrar el stream
+
+    async def event_generator():
+        asyncio.create_task(run())
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            event_type = item.pop("type")
+            data = json.dumps(item, ensure_ascii=False, default=str)
+            yield f"event: {event_type}\ndata: {data}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # desactiva buffering en nginx
+        },
+    )
 
 
 @app.get(

@@ -59,18 +59,28 @@
         <p id="cargando-estado" class="cargando-estado">Generando consultas de búsqueda</p>
         <div class="pasos-progreso">
           <div class="paso activo" id="paso-1">
-            <span class="paso-icono">🔎</span>
-            <span>Buscando</span>
+            <span class="paso-icono">💡</span>
+            <span>Consultas</span>
           </div>
           <div class="paso-linea"></div>
           <div class="paso" id="paso-2">
-            <span class="paso-icono">🧠</span>
-            <span>Analizando</span>
+            <span class="paso-icono">🔎</span>
+            <span>Búsqueda</span>
           </div>
           <div class="paso-linea"></div>
           <div class="paso" id="paso-3">
+            <span class="paso-icono">🌐</span>
+            <span>Fuentes</span>
+          </div>
+          <div class="paso-linea"></div>
+          <div class="paso" id="paso-4">
+            <span class="paso-icono">🧠</span>
+            <span>Síntesis</span>
+          </div>
+          <div class="paso-linea"></div>
+          <div class="paso" id="paso-5">
             <span class="paso-icono">📄</span>
-            <span>Generando PDF</span>
+            <span>PDF</span>
           </div>
         </div>
       </div>
@@ -165,6 +175,19 @@
         <div id="tabla-fuentes" class="tabla-fuentes-contenedor"></div>
       </div>
 
+    </section>
+
+  </main>
+
+    <!-- Historial de informes -->
+    <section id="seccion-historial" class="seccion-historial">
+      <div class="historial-header">
+        <h2 class="historial-titulo">Historial de Informes</h2>
+        <button onclick="cargarHistorial()" class="btn-secundario btn-sm">↻ Actualizar</button>
+      </div>
+      <div id="historial-contenido" class="historial-contenido">
+        <p class="historial-vacio">No hay informes generados aún.</p>
+      </div>
     </section>
 
   </main>
