@@ -401,9 +401,9 @@ class AgenteResearch:
         llm = self._llm_provider.get_modelo()
 
         # Formatear resultados para el prompt (limitar para no exceder el contexto)
-        # Con scraping habilitado, cada fuente puede traer hasta 3000 chars.
-        # Usamos 10 fuentes como balance entre profundidad y velocidad de síntesis.
-        resultados_texto = _formatear_resultados_para_prompt(resultados, max_items=10)
+        # Con scraping habilitado cada fuente trae hasta 800 chars (vs 300 sin scraping).
+        # 8 fuentes × 800 chars cabe holgadamente en el tier gratuito de Groq (12k TPM).
+        resultados_texto = _formatear_resultados_para_prompt(resultados, max_items=8)
 
         prompt = PROMPT_INFORME.format(
             tema=tema,
@@ -551,7 +551,9 @@ def _formatear_resultados_para_prompt(
     Returns:
         Texto formateado con los resultados
     """
-    MAX_CHARS_FRAGMENTO = 3000  # Contenido completo si el scraping lo enriqueció
+    # 800 chars por fuente ≈ 200 tokens → 8 fuentes ≈ 1600 tokens de contenido
+    # Groq free tier: 12k TPM. Prompt (~1500) + contenido (~1600) + output (~4000) ≈ 7100 < 12k
+    MAX_CHARS_FRAGMENTO = 800
 
     lineas = []
     for i, r in enumerate(resultados[:max_items], 1):

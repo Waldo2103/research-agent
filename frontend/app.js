@@ -72,6 +72,7 @@ async function ejecutarInvestigacion(tema) {
     const reader = respuesta.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let eventoActual = {}; // persiste entre chunks — el JSON del resultado puede llegar partido
 
     while (true) {
       const { done, value } = await reader.read();
@@ -83,7 +84,6 @@ async function ejecutarInvestigacion(tema) {
       const lineas = buffer.split("\n");
       buffer = lineas.pop(); // La última línea puede estar incompleta
 
-      let eventoActual = {};
       for (const linea of lineas) {
         if (linea.startsWith("event: ")) {
           eventoActual.type = linea.slice(7).trim();
