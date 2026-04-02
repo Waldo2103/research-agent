@@ -74,6 +74,10 @@ REGLAS IMPORTANTES:
 - NO uses comillas dentro de las frases
 - NO uses operadores como site:, filetype:, intitle:, guiones ni paréntesis
 - Las frases deben ser cortas (máximo 8 palabras)
+- Si el tema identifica a una persona específica (nombre + cargo/institución/rol), \
+incluí ese contexto en CADA frase para no mezclar con homónimos. \
+Ejemplo: si el tema es "Juan García presidente del club X", las frases deben incluir \
+"Juan García club X" o "Juan García presidente", nunca solo "Juan García".
 
 Respondé ÚNICAMENTE con este formato JSON, sin ningún otro texto:
 ["frase 1", "frase 2", "frase 3", "frase 4", "frase 5", "frase 6", "frase 7", "frase 8"]"""
