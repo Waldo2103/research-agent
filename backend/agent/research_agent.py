@@ -74,10 +74,6 @@ REGLAS IMPORTANTES:
 - NO uses comillas dentro de las frases
 - NO uses operadores como site:, filetype:, intitle:, guiones ni paréntesis
 - Las frases deben ser cortas (máximo 8 palabras)
-- CRÍTICO: si el tema identifica a una persona específica (nombre + cargo/institución/rol), \
-incluí ese contexto identificador en CADA frase para no mezclar con homónimos. \
-Ejemplo: si el tema es "Juan García presidente del club X", todas las frases deben incluir \
-"Juan García club X" o "Juan García presidente X", nunca solo "Juan García".
 
 Respondé ÚNICAMENTE con este formato JSON, sin ningún otro texto:
 ["frase 1", "frase 2", "frase 3", "frase 4", "frase 5", "frase 6", "frase 7", "frase 8"]"""
@@ -130,6 +126,9 @@ Generá un informe con EXACTAMENTE este formato JSON (no agregués campos extra)
 }}
 
 REGLAS ESTRICTAS:
+- Si los resultados incluyen información sobre múltiples personas u entidades con nombres \
+similares, identificá cuál corresponde al tema solicitado y usá ÚNICAMENTE esa información. \
+Ignorá completamente los resultados sobre otros homónimos o personas distintas.
 - clasificacion debe ser exactamente "positivo", "negativo" o "neutro"
 - puntaje debe ser un número entre -1.0 (muy negativo) y 1.0 (muy positivo)
 - Cada punto_a_favor y punto_en_contra DEBE incluir una explicación, no solo un título
