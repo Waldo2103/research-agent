@@ -412,6 +412,21 @@ body {
 .fuente-num { text-align: center; font-weight: bold; color: var(--azul-medio); width: 40px; }
 .fuente-fecha { white-space: nowrap; color: #6c757d; font-size: 12px; }
 
+/* ── Informe Detallado ── */
+.texto-detallado p {
+  margin-bottom: 16px;
+  line-height: 1.8;
+  text-align: justify;
+}
+.texto-detallado p:first-child::first-letter {
+  font-size: 2em;
+  font-weight: bold;
+  float: left;
+  line-height: 1;
+  margin: 4px 6px 0 0;
+  color: var(--azul-oscuro);
+}
+
 /* ── Historial ── */
 .seccion-historial {
   background: var(--blanco);

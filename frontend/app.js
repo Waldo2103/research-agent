@@ -157,6 +157,14 @@ function renderizarInforme(informe, duracion) {
   // Banner de sentimiento
   renderizarSentimiento(informe.analisis_sentimiento);
 
+  // Informe detallado
+  const detalladoDiv = document.getElementById("contenido-detallado");
+  detalladoDiv.innerHTML = (informe.informe_detallado || "")
+    .split("\n\n")
+    .filter((p) => p.trim())
+    .map((p) => `<p>${escaparHTML(p.trim())}</p>`)
+    .join("");
+
   // Resumen ejecutivo
   const resumenDiv = document.getElementById("contenido-resumen");
   resumenDiv.innerHTML = informe.resumen_ejecutivo

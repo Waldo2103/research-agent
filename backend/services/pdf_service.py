@@ -135,6 +135,13 @@ class PDFService:
         # Barra de puntaje (-1 a 1, convertida a 0-100% para CSS)
         puntaje_pct = int((sentimiento.puntaje + 1.0) / 2.0 * 100)
 
+        # Informe detallado
+        parrafos_detallado = informe.informe_detallado.split("\n\n") if informe.informe_detallado else []
+        detallado_html = "".join(
+            f"<p>{self._citar(p.strip())}</p>"
+            for p in parrafos_detallado if p.strip()
+        )
+
         # Párrafos del resumen ejecutivo
         parrafos_resumen = informe.resumen_ejecutivo.split("\n\n")
         resumen_html = "".join(
@@ -385,9 +392,15 @@ class PDFService:
     <ul class="lista-recomendaciones">{recomendaciones_html}</ul>
   </div>
 
-  <!-- 5. Fuentes Citadas -->
+  <!-- 5. Informe Periodístico en Profundidad -->
+  {f'''<div class="seccion">
+    <div class="seccion-titulo">5. Informe en Profundidad</div>
+    {detallado_html}
+  </div>''' if detallado_html else ''}
+
+  <!-- 6. Fuentes Citadas -->
   <div class="seccion">
-    <div class="seccion-titulo">5. Fuentes Citadas</div>
+    <div class="seccion-titulo">6. Fuentes Citadas</div>
     <table class="tabla-fuentes">
       <thead>
         <tr>
